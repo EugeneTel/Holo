@@ -143,6 +143,14 @@ void AHoloPawn::OnLookUpRate(float AxisValue)
 void AHoloPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Update weapon aim location
+	if (Weapon)
+	{
+		FVector ViewLocation = GetPawnViewLocation();
+		FTransform ViewTransform = GetMesh() ? GetMesh()->GetComponentTransform() : GetActorTransform();
+		Weapon->UpdateAimLocation(ViewLocation, ViewTransform);
+	}
 }
 
 // Called to bind functionality to input

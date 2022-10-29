@@ -2,8 +2,8 @@
 
 
 #include "Weapons/HoloWeapon.h"
-
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -17,6 +17,11 @@ AHoloWeapon::AHoloWeapon()
 	FireCooldown = 0.4f;
 	LastFireTime = TNumericLimits<float>::Lowest();
 	AimTraceDistance = 5000.0f;
+
+	// Define default values for aiming properties
+	AimInterpSpeed = 8.0f;
+	DropInterpSpeed = 10.0f;
+	DropRotation = FRotator(-30.0f, -80.0f, 0.0f);
 
 	// Create components
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
@@ -44,14 +49,62 @@ void AHoloWeapon::BeginPlay()
 void AHoloWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	AdjustWeaponRotation();
 }
 
+void AHoloWeapon::UpdateAimLocation(FVector& ViewLocation, FTransform& ViewTransform)
+{
+	const FVector ViewForward = ViewTransform.GetUnitAxis(EAxis::X);
+
+	// Prepare a line trace to find the first blocking primitive beneath the center of our view
+	const FVector& TraceStart = ViewLocation;
+	const FVector TraceEnd = TraceStart + (ViewForward * AimTraceDistance);
+	const FName ProfileName = UCollisionProfile::BlockAllDynamic_ProfileName;
+	const FCollisionQueryParams QueryParams(TEXT("PlayerAim"), false, GetOwner());
+
+	// If we hit something, that's what we're aiming at;
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByProfile(Hit, TraceStart, TraceEnd, ProfileName, QueryParams))
+	{
+		AimLocation = Hit.ImpactPoint;
+		// UKismetSystemLibrary::DrawDebugBox(this, AimLocation, FVector(20), FLinearColor::Green);
+	}
+	else
+	{
+		AimLocation = TraceEnd;
+	}
+	
+	// UKismetSystemLibrary::DrawDebugLine(this, TraceStart, TraceEnd, FLinearColor::Green);
+
+	const FVector ViewAimLocation = ViewTransform.InverseTransformPosition(AimLocation);
+
+	// If the target to close aim is not valid
+	bAimLocationIsValid = ViewAimLocation.X > MuzzleHandle->GetRelativeLocation().X;
+}
+
+void AHoloWeapon::AdjustWeaponRotation()
+{
+	if (bAimLocationIsValid)
+	{
+		// Aiming at the target
+		const FRotator TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), AimLocation);
+		const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, GetWorld()->GetDeltaSeconds(), AimInterpSpeed);
+		SetActorRotation(NewRotation);
+	}
+	else
+	{
+		// Rotate the weapon to the side
+		const AActor* AttachParent = GetAttachParentActor();
+		const FQuat TargetRotation = AttachParent ? AttachParent->GetActorTransform().TransformRotation(FQuat(DropRotation)) : FQuat(DropRotation);
+		const FQuat NewRotation = FMath::QInterpTo(GetActorQuat(), TargetRotation, GetWorld()->GetDeltaSeconds(), DropInterpSpeed);
+		SetActorRotation(NewRotation);
+	}
+}
 
 void AHoloWeapon::HandleFireInput()
 {
-	const float CurrentTime = GetWorld()->GetTimeSeconds();
-	const float ElapsedSinceLastFire = CurrentTime - LastFireTime;
-	if (ElapsedSinceLastFire < FireCooldown)
+	if (!CanFire())
 	{
 		return;
 	}
@@ -59,7 +112,7 @@ void AHoloWeapon::HandleFireInput()
 	const FVector MuzzleLocation = MuzzleHandle->GetComponentLocation();
 	const FVector Direction = MuzzleHandle->GetComponentQuat().Vector();
 	Server_TryFire(MuzzleLocation, Direction);
-	LastFireTime = CurrentTime;
+	LastFireTime = GetWorld()->GetTimeSeconds();
 
 	if (!HasAuthority())
 	{
@@ -75,7 +128,14 @@ void AHoloWeapon::HandleFireInput()
 	}
 }
 
-void AHoloWeapon::PlayFireEffects()
+bool AHoloWeapon::CanFire() const
+{
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+	const float ElapsedSinceLastFire = CurrentTime - LastFireTime;
+	return bAimLocationIsValid && ElapsedSinceLastFire >= FireCooldown;
+}
+
+void AHoloWeapon::PlayFireEffects() const
 {
 	if (FireEffect)
 	{
