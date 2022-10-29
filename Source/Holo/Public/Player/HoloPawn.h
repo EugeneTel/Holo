@@ -27,10 +27,23 @@ public:
 	//~ Begin ACharacter Interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	//~ End ACharacter Interface
-
+	
 	void Auth_SetColor(const FLinearColor& InColor);
+	FLinearColor& GetColor() { return Color; };
 
 protected:
+
+	/** Scene component indicating where the pawn's Weapon should be attached. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
+	class USceneComponent* WeaponHandle;
+
+	/** The weapon that this player is holding, if any. */
+	UPROPERTY(ReplicatedUsing=OnRep_Weapon, Transient, BlueprintReadOnly, Category="Weapon")
+	class AHoloWeapon* Weapon;
+
+	/** The weapon class that will be created on spawn */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon")
+	TSubclassOf<AHoloWeapon> DefaultWeaponClass;
 
 	/** Material instance assigned to the character mesh, giving us control over the shader parameters at runtime. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Player")
@@ -40,11 +53,18 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_Color, Transient, BlueprintReadOnly, Category="Player")
 	FLinearColor Color;
 
+	/** Spawn specific weapon and attach to the Pawn */
+	void Auth_SpawnWeapon(TSubclassOf<AHoloWeapon> WeaponClass);
+
 private:
 
 	/** Updates the MeshMID's color parameter to match our current Color property. */
 	UFUNCTION()
 	void OnRep_Color() const;
+
+	/** For client-side Pawns, ensures that the Weapon is attached to the WeaponHandle. */
+	UFUNCTION()
+	void OnRep_Weapon();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Input handling

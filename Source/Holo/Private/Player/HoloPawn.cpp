@@ -6,6 +6,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Weapons/HoloWeapon.h"
 
 
 // Sets default values
@@ -13,15 +14,9 @@ AHoloPawn::AHoloPawn()
 {
 	BaseEyeHeight = 18.0f;
 	bUseControllerRotationPitch = true;
-	
 	PrimaryActorTick.bCanEverTick = true;
 
-	UCapsuleComponent* CollisionComponent = GetCapsuleComponent();
-	if (CollisionComponent)
-	{
-		CollisionComponent->SetCapsuleSize(32.0f, 32.0f, false);
-	}
-
+	// Change the default CharacterMovementComponent behavior: we want our player pawns to be able to fly around freely
 	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
 	if (MovementComponent)
 	{
@@ -30,13 +25,26 @@ AHoloPawn::AHoloPawn()
 		MovementComponent->MaxFlySpeed = 800.0f;
 		MovementComponent->BrakingDecelerationFlying = 5000.0f;
 	}
+
+	// Create an additional SceneComponent and position it where we want the root of the Weapon actor to be attached.
+	USkeletalMeshComponent* MeshComponent = GetMesh();
+	WeaponHandle = CreateDefaultSubobject<USceneComponent>(TEXT("WeaponHandle"));
+	WeaponHandle->SetUsingAbsoluteScale(true);
+	WeaponHandle->SetupAttachment(MeshComponent ? MeshComponent : RootComponent);
+	WeaponHandle->SetRelativeLocation(FVector(15.0f, 8.0f, 6.0f));
 }
 
 // Called when the game starts or when spawned
 void AHoloPawn::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (HasAuthority())
+	{
+		// Spawn default weapon
+		checkf(DefaultWeaponClass, TEXT("DefaultWeaponClass is not set"));
+		Auth_SpawnWeapon(DefaultWeaponClass);
+	}
 }
 
 void AHoloPawn::PostInitializeComponents()
@@ -60,8 +68,21 @@ void AHoloPawn::OnRep_Color() const
 	}
 }
 
+void AHoloPawn::OnRep_Weapon()
+{
+	if (Weapon)
+	{
+		Weapon->AttachToComponent(WeaponHandle, FAttachmentTransformRules::SnapToTargetIncludingScale);
+		Weapon->AddTickPrerequisiteActor(this);
+	}
+}
+
 void AHoloPawn::OnFire()
 {
+	if (Weapon)
+	{
+		Weapon->HandleFireInput();
+	}
 }
 
 void AHoloPawn::OnMoveForward(float AxisValue)
@@ -151,10 +172,27 @@ void AHoloPawn::Auth_SetColor(const FLinearColor& InColor)
 	OnRep_Color();
 }
 
+void AHoloPawn::Auth_SpawnWeapon(TSubclassOf<AHoloWeapon> WeaponClass)
+{
+	checkf(HasAuthority(), TEXT("AHoloPawn::Auth_SpawnWeapon called on client"));
+
+	FActorSpawnParameters SpawnInfo;
+	SpawnInfo.Owner = this;
+	SpawnInfo.Instigator = this;
+	SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	const FVector SpawnLocation = WeaponHandle->GetComponentLocation();
+	const FRotator SpawnRotation = WeaponHandle->GetComponentRotation();
+	Weapon = GetWorld()->SpawnActor<AHoloWeapon>(WeaponClass, SpawnLocation, SpawnRotation, SpawnInfo);
+
+	OnRep_Weapon();
+}
+
 void AHoloPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME(AHoloPawn, Weapon);
 	DOREPLIFETIME(AHoloPawn, Color);
 }
 
