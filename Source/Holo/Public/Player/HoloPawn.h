@@ -9,6 +9,7 @@
 class UHoloGameLayoutWidget;
 class UHoloHealthComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPawnDying);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPawnColorChanged, const FLinearColor&, Color);
 
 UCLASS()
@@ -38,9 +39,36 @@ public:
 	void Auth_SetColor(const FLinearColor& InColor);
 	FLinearColor& GetColor() { return Color; };
 	UHoloHealthComponent* GetHealthComponent() const;
+
+	/**
+	* Kills pawn.  Server/authority only.
+	* @param KillingDamage - Damage amount of the killing blow
+	* @param DamageEvent - Damage event of the killing blow
+	* @param Killer - Who killed this pawn
+	* @param DamageCauser - the Actor that directly caused the damage (i.e. the Projectile that exploded, the Weapon that fired, etc)
+	* @returns true if allowed
+	*/
+	virtual bool Die(float KillingDamage, FDamageEvent const& DamageEvent, AController* Killer, AActor* DamageCauser);
+
+	/** Returns True if the pawn can die in the current state */
+	virtual bool CanDie(float KillingDamage, FDamageEvent const& DamageEvent, AController* Killer, AActor* DamageCauser) const;
+
+	/** Delegate fire when the Pawn dies */
+	UPROPERTY(BlueprintAssignable)
+	FOnPawnDying OnDyingDelegate;
 	
 	UPROPERTY(BlueprintAssignable)
 	FOnPawnColorChanged OnColorChangedDelegate;
+
+	/** Identifies if pawn is in its dying state */
+	UPROPERTY(ReplicatedUsing = OnRep_IsDying, BlueprintReadOnly, Category = Health)
+	uint32 bIsDying : 1;
+
+	UFUNCTION()
+	void OnRep_IsDying();
+
+	/** Destroy and restart player */
+	void RestartPlayer();
 
 protected:
 
@@ -61,12 +89,18 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Widgets")
 	TSubclassOf<UHoloGameLayoutWidget> GameLayoutWidgetClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category=Effects)
+	TSubclassOf<UCameraShakeBase> DamageCameraShake;
+	
+	UPROPERTY(EditDefaultsOnly, Category=Effects)
+	TSubclassOf<UCameraShakeBase> DeathCameraShake;
 
 	UPROPERTY(BlueprintReadOnly, Category="Widgets")
 	UHoloGameLayoutWidget* GameLayoutWidget;
 
 	/** Material instance assigned to the character mesh, giving us control over the shader parameters at runtime. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Player")
+	UPROPERTY(BlueprintReadOnly, Category="Player")
 	UMaterialInstanceDynamic* MeshMID;
 	
 	/** An arbitrary color that identifies this player; assigned by the game mode on spawn. Controls the color of the mesh. */
@@ -75,6 +109,14 @@ protected:
 
 	/** Spawn specific weapon and attach to the Pawn */
 	void Auth_SpawnWeapon(TSubclassOf<AHoloWeapon> WeaponClass);
+
+	/** notification when killed, for both the server and client. */
+	virtual void OnDeath(float KillingDamage, struct FDamageEvent const& DamageEvent, class APawn* InstigatingPawn, class AActor* DamageCauser);
+
+	/** switch to ragdoll */
+	void SetRagdollPhysics();
+
+	void PlayCameraShake(TSubclassOf<UCameraShakeBase> CameraShake) const;
 
 private:
 

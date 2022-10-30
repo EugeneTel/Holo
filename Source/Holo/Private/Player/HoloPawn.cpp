@@ -5,9 +5,11 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/HoloGameMode.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/HoloHealthComponent.h"
+#include "Player/HoloPlayerController.h"
 #include "UI/HoloGameLayoutWidget.h"
 #include "Weapons/HoloWeapon.h"
 
@@ -109,7 +111,7 @@ void AHoloPawn::OnRep_Weapon()
 
 void AHoloPawn::OnFire()
 {
-	if (Weapon)
+	if (Weapon && !bIsDying)
 	{
 		Weapon->HandleFireInput();
 	}
@@ -231,11 +233,110 @@ void AHoloPawn::Auth_SpawnWeapon(TSubclassOf<AHoloWeapon> WeaponClass)
 	OnRep_Weapon();
 }
 
+
+bool AHoloPawn::Die(float KillingDamage, FDamageEvent const& DamageEvent, AController* Killer, AActor* DamageCauser)
+{
+	if (!CanDie(KillingDamage, DamageEvent, Killer, DamageCauser))
+	{
+		return false;
+	}
+
+	OnDeath(KillingDamage, DamageEvent, Killer ? Killer->GetPawn() : nullptr, DamageCauser);
+
+	return true;
+}
+
+bool AHoloPawn::CanDie(float KillingDamage, FDamageEvent const& DamageEvent, AController* Killer, AActor* DamageCauser) const
+{
+	if (bIsDying										// already dying
+		|| IsPendingKill()								// already destroyed
+		|| GetLocalRole() != ROLE_Authority				// not authority
+		|| GetWorld()->GetAuthGameMode<AHoloGameMode>() == nullptr)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void AHoloPawn::OnRep_IsDying()
+{
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	
+	if (Weapon)
+	{
+		Weapon->SetActorTickEnabled(false);
+	}
+
+	// visual effects
+	SetRagdollPhysics();
+	GetMesh()->AddTorqueInRadians(FVector(10000000.0));
+
+	if (DeathCameraShake)
+	{
+		PlayCameraShake(DeathCameraShake);
+	}
+}
+
+void AHoloPawn::RestartPlayer()
+{
+	AHoloPlayerController* PC = CastChecked<AHoloPlayerController>(GetController());
+
+	if (Weapon)
+	{
+		Weapon->Destroy();
+	}
+	
+	Destroy();
+	
+	PC->Respawn();
+}
+
+void AHoloPawn::OnDeath(float KillingDamage, FDamageEvent const& DamageEvent, APawn* InstigatingPawn, AActor* DamageCauser)
+{
+	bIsDying = true;
+	OnRep_IsDying();
+
+	UCharacterMovementComponent* MoveComponent = GetCharacterMovement();
+	MoveComponent->StopMovementImmediately();
+	MoveComponent->DisableMovement();
+	MoveComponent->SetComponentTickEnabled(false);
+	
+	FTimerHandle TimerHandle_Restart;
+	GetWorldTimerManager().SetTimer(TimerHandle_Restart, this, &AHoloPawn::RestartPlayer, 3.0f, false);
+}
+
+void AHoloPawn::SetRagdollPhysics()
+{
+	if (IsPendingKill() || !GetMesh() || !GetMesh()->GetPhysicsAsset())
+	{
+		return;
+	}
+
+	// initialize physics/etc
+	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->WakeAllRigidBodies();
+	GetMesh()->bBlendPhysics = true;
+
+	static FName CollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetCollisionProfileName(CollisionProfileName);
+}
+
+void AHoloPawn::PlayCameraShake(TSubclassOf<UCameraShakeBase> CameraShake) const
+{
+	AHoloPlayerController* PC = Cast<AHoloPlayerController>(GetController());
+	if (PC && PC->IsLocalController())
+	{
+		PC->ClientStartCameraShake(CameraShake, 1);
+	}
+}
+
 void AHoloPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AHoloPawn, Weapon);
 	DOREPLIFETIME(AHoloPawn, Color);
+	DOREPLIFETIME(AHoloPawn, bIsDying);
 }
 

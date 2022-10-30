@@ -10,7 +10,7 @@ void AHoloHUD::DrawHUD()
 	Super::DrawHUD();
 
 	AHoloPawn* Pawn = Cast<AHoloPawn>(GetOwningPawn());
-	if (!Pawn || !Canvas)
+	if (!Pawn || Pawn->bIsDying || !Canvas)
 	{
 		return;
 	}

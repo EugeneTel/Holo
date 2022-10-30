@@ -12,4 +12,9 @@ UCLASS()
 class HOLO_API AHoloPlayerController : public APlayerController
 {
 	GENERATED_BODY()
+
+public:
+
+	/** respawn after dying */
+	void Respawn();
 };

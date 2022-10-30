@@ -28,6 +28,16 @@ float UHoloHealthComponent::ApplyDamage(float Damage, FDamageEvent const& Damage
 {
 	CurrentHealth = FMath::Max<float>(CurrentHealth - Damage, 0.0f);
 	OnRep_CurrentHealth();
+	
+	if (CurrentHealth <= 0.0f)
+	{
+		// Death
+		AHoloPawn* Pawn = Cast<AHoloPawn>(GetOwner());
+		if (Pawn)
+		{
+			Pawn->Die(Damage, DamageEvent, EventInstigator, DamageCauser);
+		}
+	}
 
 	return Damage;
 }
