@@ -5,6 +5,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/HoloPlayerController.h"
 
 
 AHoloWeapon::AHoloWeapon()
@@ -138,6 +139,11 @@ bool AHoloWeapon::CanFire() const
 
 void AHoloWeapon::PlayFireEffects() const
 {
+	if (!GetOwner())
+	{
+		return;
+	}
+	
 	if (FireEffect)
 	{
 		UGameplayStatics::SpawnEmitterAttached(FireEffect, MuzzleHandle);
@@ -146,6 +152,12 @@ void AHoloWeapon::PlayFireEffects() const
 	if (FireSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(GetWorld(), FireSound, MuzzleHandle->GetComponentLocation(), MuzzleHandle->GetComponentRotation());
+	}
+
+	AHoloPlayerController* PC = Cast<AHoloPlayerController>(GetOwner()->GetInstigatorController());
+	if (FireCameraShake && PC && PC->IsLocalController())
+	{
+		PC->ClientStartCameraShake(FireCameraShake);
 	}
 }
 

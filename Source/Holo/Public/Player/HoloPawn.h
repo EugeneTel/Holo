@@ -118,6 +118,9 @@ protected:
 
 	void PlayCameraShake(TSubclassOf<UCameraShakeBase> CameraShake) const;
 
+	UFUNCTION(client, unreliable)
+	void Client_SimulateDamage();
+
 private:
 
 	/** Updates the MeshMID's color parameter to match our current Color property. */

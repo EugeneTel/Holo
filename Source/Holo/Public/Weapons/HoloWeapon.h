@@ -75,24 +75,27 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 
 	/** Visual effect to play (at the muzzle) when the weapon is fired. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Firing")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
 	UParticleSystem* FireEffect;
 
 	/** Particle system spawned when the weapon hits something (with +X oriented along the impact normal). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Firing")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
 	UParticleSystem* ImpactEffect;
 
 	/** Sound to play when the weapon is fired. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Firing")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
 	USoundBase* FireSound;
 
 	/** Sound to play when the weapon hits an actor and successfully deals damage. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Firing")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
 	USoundBase* DamagingImpactSound;
 
 	/** Sound to play when the weapon hits an inert surface. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Firing")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
 	USoundBase* NonDamagingImpactSound;
+
+	UPROPERTY(EditDefaultsOnly, Category=Effects)
+	TSubclassOf<UCameraShakeBase> FireCameraShake;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Aim

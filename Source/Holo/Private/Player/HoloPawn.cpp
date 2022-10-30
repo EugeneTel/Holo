@@ -83,6 +83,8 @@ float AHoloPawn::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		HealthComponent->ApplyDamage(ActualDamage, DamageEvent, EventInstigator, DamageCauser);
 	}
 
+	Client_SimulateDamage();
+
 	return ActualDamage;
 }
 
@@ -329,6 +331,11 @@ void AHoloPawn::PlayCameraShake(TSubclassOf<UCameraShakeBase> CameraShake) const
 	{
 		PC->ClientStartCameraShake(CameraShake, 1);
 	}
+}
+
+void AHoloPawn::Client_SimulateDamage_Implementation()
+{
+	PlayCameraShake(DamageCameraShake);
 }
 
 void AHoloPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
