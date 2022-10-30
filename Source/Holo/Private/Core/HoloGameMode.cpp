@@ -2,6 +2,8 @@
 
 
 #include "Core/HoloGameMode.h"
+#include "GameFramework/PlayerStart.h"
+#include "Kismet/GameplayStatics.h"
 #include "Player/HoloPawn.h"
 
 AHoloGameMode::AHoloGameMode()
@@ -16,6 +18,11 @@ AHoloGameMode::AHoloGameMode()
 	LastPlayerColorIndex = -1;
 }
 
+void AHoloGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
 void AHoloGameMode::SetPlayerDefaults(APawn* PlayerPawn)
 {
 	Super::SetPlayerDefaults(PlayerPawn);
@@ -24,6 +31,19 @@ void AHoloGameMode::SetPlayerDefaults(APawn* PlayerPawn)
 	check(HoloPawn);
 
 	SetPlayerColor(HoloPawn);
+}
+
+AActor* AHoloGameMode::FindPlayerStart_Implementation(AController* Player, const FString& IncomingName)
+{
+	if (StartActors.Num() <= 0)
+	{
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), StartActors);
+	}
+
+	checkf(StartActors.Num() > 0, TEXT("There is no PlayerStart on the map"));
+	
+	const int32 Index = FMath::RandRange(0, StartActors.Num() - 1);
+	return StartActors[Index];
 }
 
 void AHoloGameMode::SetPlayerColor(AHoloPawn* HoloPawn)
