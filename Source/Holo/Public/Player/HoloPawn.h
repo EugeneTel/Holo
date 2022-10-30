@@ -6,6 +6,11 @@
 #include "GameFramework/Character.h"
 #include "HoloPawn.generated.h"
 
+class UHoloGameLayoutWidget;
+class UHoloHealthComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPawnColorChanged, const FLinearColor&, Color);
+
 UCLASS()
 class HOLO_API AHoloPawn : public ACharacter
 {
@@ -18,24 +23,33 @@ public:
 	//~ Begin AActor Interface
 	virtual void Tick(float DeltaTime) override;
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 	//~ End AActor Interface
 
 	//~ Begin APawn Interface
-	virtual void PostInitializeComponents() override;
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 	//~ End APawn Interface
 
 	//~ Begin ACharacter Interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	//~ End ACharacter Interface
-	
+
+	// Getters & Setters
 	void Auth_SetColor(const FLinearColor& InColor);
 	FLinearColor& GetColor() { return Color; };
+	UHoloHealthComponent* GetHealthComponent() const;
+	
+	UPROPERTY(BlueprintAssignable)
+	FOnPawnColorChanged OnColorChangedDelegate;
 
 protected:
 
 	/** Scene component indicating where the pawn's Weapon should be attached. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
 	class USceneComponent* WeaponHandle;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
+	UHoloHealthComponent* HealthComponent;
 
 	/** The weapon that this player is holding, if any. */
 	UPROPERTY(ReplicatedUsing=OnRep_Weapon, Transient, BlueprintReadOnly, Category="Weapon")
@@ -44,6 +58,12 @@ protected:
 	/** The weapon class that will be created on spawn */
 	UPROPERTY(EditDefaultsOnly, Category="Weapon")
 	TSubclassOf<AHoloWeapon> DefaultWeaponClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Widgets")
+	TSubclassOf<UHoloGameLayoutWidget> GameLayoutWidgetClass;
+
+	UPROPERTY(BlueprintReadOnly, Category="Widgets")
+	UHoloGameLayoutWidget* GameLayoutWidget;
 
 	/** Material instance assigned to the character mesh, giving us control over the shader parameters at runtime. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Player")
@@ -60,7 +80,7 @@ private:
 
 	/** Updates the MeshMID's color parameter to match our current Color property. */
 	UFUNCTION()
-	void OnRep_Color() const;
+	void OnRep_Color();
 
 	/** For client-side Pawns, ensures that the Weapon is attached to the WeaponHandle. */
 	UFUNCTION()

@@ -3,9 +3,12 @@
 
 #include "Player/HoloPawn.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/HoloHealthComponent.h"
+#include "UI/HoloGameLayoutWidget.h"
 #include "Weapons/HoloWeapon.h"
 
 
@@ -32,6 +35,9 @@ AHoloPawn::AHoloPawn()
 	WeaponHandle->SetUsingAbsoluteScale(true);
 	WeaponHandle->SetupAttachment(MeshComponent ? MeshComponent : RootComponent);
 	WeaponHandle->SetRelativeLocation(FVector(15.0f, 8.0f, 6.0f));
+
+	HealthComponent = CreateDefaultSubobject<UHoloHealthComponent>(TEXT("HealthComponent"));
+	HealthComponent->SetIsReplicated(true);
 }
 
 // Called when the game starts or when spawned
@@ -44,6 +50,14 @@ void AHoloPawn::BeginPlay()
 		// Spawn default weapon
 		checkf(DefaultWeaponClass, TEXT("DefaultWeaponClass is not set"));
 		Auth_SpawnWeapon(DefaultWeaponClass);
+	}
+
+	if (IsLocallyControlled())
+	{
+		checkf(GameLayoutWidgetClass, TEXT("GameLayoutWidgetClass is not set!"));
+
+		GameLayoutWidget = CreateWidget<UHoloGameLayoutWidget>(GetGameInstance(), GameLayoutWidgetClass);
+		GameLayoutWidget->AddToViewport();
 	}
 }
 
@@ -59,12 +73,28 @@ void AHoloPawn::PostInitializeComponents()
 	}
 }
 
-void AHoloPawn::OnRep_Color() const
+float AHoloPawn::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	if (ActualDamage > 0.0f && HealthComponent)
+	{
+		HealthComponent->ApplyDamage(ActualDamage, DamageEvent, EventInstigator, DamageCauser);
+	}
+
+	return ActualDamage;
+}
+
+void AHoloPawn::OnRep_Color()
 {
 	if (MeshMID)
 	{
 		// this is the sort of thing that's better done in Blueprints, but we're handling it here for simplicity.
 		MeshMID->SetVectorParameterValue(TEXT("Color"), Color);
+	}
+
+	if (OnColorChangedDelegate.IsBound())
+	{
+		OnColorChangedDelegate.Broadcast(Color);
 	}
 }
 
@@ -178,6 +208,11 @@ void AHoloPawn::Auth_SetColor(const FLinearColor& InColor)
 	Color = InColor;
 
 	OnRep_Color();
+}
+
+UHoloHealthComponent* AHoloPawn::GetHealthComponent() const
+{
+	return HealthComponent;
 }
 
 void AHoloPawn::Auth_SpawnWeapon(TSubclassOf<AHoloWeapon> WeaponClass)

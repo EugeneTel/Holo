@@ -15,6 +15,7 @@ AHoloWeapon::AHoloWeapon()
 
 	// Define default cooldown/firing properties
 	FireCooldown = 0.4f;
+	BaseDamage = 30.0f;
 	LastFireTime = TNumericLimits<float>::Lowest();
 	AimTraceDistance = 5000.0f;
 
@@ -201,7 +202,6 @@ void AHoloWeapon::Server_TryFire_Implementation(const FVector& MuzzleLocation, c
 		float DamageCaused = 0.0f;
 		if (Hit.Actor.IsValid() && Hit.Actor->CanBeDamaged())
 		{
-			const float BaseDamage = 1.0f;
 			const FPointDamageEvent DamageEvent(BaseDamage, Hit, Direction, UDamageType::StaticClass());
 			DamageCaused = Hit.Actor->TakeDamage(BaseDamage, DamageEvent, GetInstigatorController(), this);
 		}

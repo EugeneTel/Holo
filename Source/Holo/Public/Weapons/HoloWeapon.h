@@ -66,6 +66,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Firing")
 	float FireCooldown;
 
+	/** How much base damage does a weapon do */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Firing")
+	float BaseDamage;
+
 	//////////////////////////////////////////////////////////////////////////
 	// VFX & SFX
 	//////////////////////////////////////////////////////////////////////////
@@ -130,6 +134,7 @@ private:
 	/** Game time when the weapon was last fired, for cooldown checks. */
 	float LastFireTime;
 
+	// Effects
 	void PlayFireEffects() const;
 	void PlayImpactEffects(const FVector& ImpactPoint, const FVector& ImpactNormal, bool bCausedDamage);
 	bool RunFireTrace(FHitResult& OutHit);
